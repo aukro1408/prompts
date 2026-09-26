@@ -113,6 +113,22 @@ button{font-family:inherit;}
   background:#1d1712; border:1px solid rgba(232,168,62,.3); border-radius:18px;
   padding:14px; box-shadow:0 18px 44px rgba(0,0,0,.5);}
 .sync-panel[hidden]{display:none;}
+.secret-wrap{position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
+  background:rgba(8,6,4,.72); backdrop-filter:blur(6px); padding:24px;}
+.secret-wrap[hidden]{display:none;}
+.secret-box{width:100%; max-width:340px; background:#1d1712; border:1px solid rgba(232,168,62,.35);
+  border-radius:20px; padding:20px; box-shadow:0 24px 60px rgba(0,0,0,.6);}
+.secret-title{font-size:17px; font-weight:800; color:var(--gold); margin-bottom:8px;}
+.secret-hint{font-size:13.5px; line-height:1.5; color:rgba(243,237,227,.65); margin-bottom:14px;}
+.secret-input{width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; font-size:14px;
+  font-family:inherit; background:rgba(255,255,255,.06); border:1px solid rgba(232,168,62,.25);
+  color:#f3ede3; outline:none; margin-bottom:14px;}
+.secret-input:focus{border-color:var(--gold);}
+.secret-row{display:flex; gap:10px;}
+.secret-cancel,.secret-save{flex:1; padding:12px; border-radius:14px; border:0; cursor:pointer;
+  font-size:14.5px; font-weight:700; font-family:inherit;}
+.secret-cancel{background:rgba(255,255,255,.08); color:rgba(243,237,227,.75);}
+.secret-save{background:linear-gradient(135deg,#f6cd6f,#e8a83e); color:#231703;}
 .sync-status{font-size:13.5px; color:rgba(243,237,227,.78); margin-bottom:12px; line-height:1.45;}
 .sync-action{display:block; width:100%; padding:12px; border-radius:14px; border:0; cursor:pointer;
   font-size:14.5px; font-weight:700; font-family:inherit;
@@ -322,6 +338,17 @@ body.lock{overflow:hidden;}
       <div class="sync-status" id="syncStatus">Не подключено</div>
       <button class="sync-action" id="syncNowBtn">Синхронизировать сейчас</button>
       <button class="sync-action dim" id="syncLogoutBtn">Выйти</button>
+    </div>
+    <div class="secret-wrap" id="secretWrap" hidden>
+      <div class="secret-box">
+        <div class="secret-title">Ключ Google</div>
+        <div class="secret-hint">Вставь Client secret один раз — он сохранится только на этом устройстве. Взять его: консоль Google → Credentials → твой клиент → Add secret.</div>
+        <input id="secretInput" class="secret-input" placeholder="GOCSPX-…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div class="secret-row">
+          <button class="secret-cancel" id="secretCancel">Отмена</button>
+          <button class="secret-save" id="secretSave">Сохранить</button>
+        </div>
+      </div>
     </div>
   </div>
   <p class="count" id="count"></p>
@@ -717,7 +744,10 @@ async function pkceChallenge(v){
   const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));
   return b64url(new Uint8Array(d));
 }
+/* секрет клиента хранится только на устройстве (localStorage gdrive_cs), вводится один раз */
+function gSecret(){try{return localStorage.getItem('gdrive_cs')||'';}catch(e){return '';}}
 function gLogin(){
+  if(!gSecret()){ $('secretWrap').hidden=false; setTimeout(()=>{try{$('secretInput').focus({preventScroll:true});}catch(e){}},80); return; }
   const verifier=randB64(64);
   try{sessionStorage.setItem('pkce_v',verifier);}catch(e){}
   pkceChallenge(verifier).then(ch=>{
@@ -735,7 +765,7 @@ function gLogin(){
 }
 async function gExchange(code){
   let verifier=''; try{verifier=sessionStorage.getItem('pkce_v')||'';}catch(e){}
-  const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,code:code,code_verifier:verifier,
+  const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,client_secret:gSecret(),code:code,code_verifier:verifier,
     grant_type:'authorization_code',redirect_uri:REDIRECT_URI});
   let j={}, http=0;
   try{
@@ -749,13 +779,14 @@ async function gExchange(code){
     if(j.refresh_token){try{localStorage.setItem('gdrive_rt',j.refresh_token);}catch(e){}}
     return j.access_token;
   }
+  if(j.error==='invalid_client'){try{localStorage.removeItem('gdrive_cs');}catch(e){}}
   toastErr('Вход не удался: '+(j.error_description||j.error||('http '+http)));
   return null;
 }
 async function gRefresh(){
   let rt=null; try{rt=localStorage.getItem('gdrive_rt');}catch(e){}
   if(!rt)return null;
-  const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,grant_type:'refresh_token',refresh_token:rt});
+  const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,client_secret:gSecret(),grant_type:'refresh_token',refresh_token:rt});
   let r;
   try{
     r=await fetch('https://oauth2.googleapis.com/token',
@@ -799,6 +830,15 @@ $('syncLogoutBtn').addEventListener('click',async()=>{
   try{localStorage.removeItem('gdrive_rt');}catch(e){}
   gToken=null; driveFileId=null; setCloudUI(false); toast('Выход выполнен');
 });
+$('secretSave').addEventListener('click',()=>{
+  const v=$('secretInput').value.trim();
+  if(!v){toastErr('Вставь секрет'); return;}
+  try{localStorage.setItem('gdrive_cs',v);}catch(e){}
+  $('secretWrap').hidden=true; $('secretInput').value='';
+  gLogin();
+});
+$('secretCancel').addEventListener('click',()=>{$('secretWrap').hidden=true;});
+$('secretWrap').addEventListener('click',e=>{if(e.target===$('secretWrap'))$('secretWrap').hidden=true;});
 
 async function driveApi(path,opts,retried){
   opts=opts||{};
