@@ -483,7 +483,7 @@ let editing=null;
 function render(){
   const query=q.value.trim().toLowerCase();
   const items=[...db.prompts]
-    .sort((a,b)=>((b.fav?1:0)-(a.fav?1:0))||(b.createdAt-a.createdAt))
+    .sort((a,b)=>b.createdAt-a.createdAt)
     .filter(p=>!favOnly||p.fav)
     .filter(p=>!query||p.name.toLowerCase().includes(query));
   countEl.textContent=db.prompts.length
