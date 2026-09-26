@@ -101,7 +101,7 @@ button{font-family:inherit;}
 .card .star{position:absolute; top:10px; right:10px; width:40px; height:40px; font-size:21px;
   background:rgba(10,8,5,.5); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
 .picbody{position:absolute; left:0; right:0; bottom:0; padding:14px 14px 12px;}
-.picpills{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+.picpills{display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; max-width:72%;}
 .picpills .model-pill,.picpills .tag{font-size:11px; padding:5px 10px;
   background:rgba(18,12,7,.55); border-color:rgba(232,168,62,.4);
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
@@ -109,7 +109,7 @@ button{font-family:inherit;}
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
 .pictext{margin:7px 0 0; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.78);
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
-.picfoot{display:flex; margin-top:10px;}
+.picfoot{display:flex; justify-content:space-between; align-items:flex-end; gap:8px; margin-top:10px;}
 .minicopy{width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.22);
   background:rgba(255,255,255,.14); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
   color:#fff; display:grid; place-items:center; cursor:pointer;}
@@ -511,12 +511,13 @@ function render(){
       +'<div class="picshade"></div>'
       +'<button class="icon-btn star'+(p.fav?' on':'')+'" data-act="fav" aria-label="В избранное">★</button>'
       +'<div class="picbody">'
-      +(pills?'<div class="picpills">'+pills+'</div>':'')
       +'<h3>'+esc(p.name)+'</h3>'
       +'<p class="pictext">'+esc(p.text)+'</p>'
       +'<div class="picfoot"><button class="minicopy" data-act="copy" aria-label="Копировать">'
       +'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
-      +'</button></div>'
+      +'</button>'
+      +(pills?'<div class="picpills">'+pills+'</div>':'')
+      +'</div>'
       +'</div></article>';
   }).join('');
 }
