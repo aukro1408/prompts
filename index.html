@@ -90,25 +90,30 @@ button{font-family:inherit;}
 .count{margin:14px 4px 16px; color:rgba(243,237,227,.48); font-size:14px;}
 
 #list{display:flex; flex-wrap:wrap; gap:14px;}
-.card{flex:1 1 100%; background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.09);
-  border-radius:24px; padding:18px;
+.card{flex:1 1 calc(50% - 7px); max-width:calc(50% - 7px); position:relative;
+  background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.09);
+  border-radius:22px; overflow:hidden; cursor:pointer;
   box-shadow:0 12px 32px rgba(0,0,0,.35);}
-.card.pic{flex:1 1 calc(50% - 7px); max-width:calc(50% - 7px); padding:12px;}
-.picwrap{position:relative; border-radius:16px; overflow:hidden; aspect-ratio:3/4; margin-bottom:10px;
-  background:rgba(255,255,255,.04);}
-.picwrap img{width:100%; height:100%; object-fit:cover; display:block;}
-.picwrap .star{position:absolute; top:8px; right:8px; width:38px; height:38px; font-size:20px;
+.card:active{transform:scale(.98);}
+.card>img{width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:rgba(255,255,255,.04);}
+.picshade{position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(8,6,4,.14) 0%, rgba(8,6,4,0) 30%, rgba(8,6,4,.42) 58%, rgba(8,6,4,.95) 100%);}
+.card .star{position:absolute; top:10px; right:10px; width:40px; height:40px; font-size:21px;
   background:rgba(10,8,5,.5); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
-.card.pic h3{margin:0; font-size:15px; line-height:1.32; color:#fff; letter-spacing:-.2px;}
-.card.pic .meta{margin-top:8px;}
-.card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
-.card-head h3{margin:0; font-size:18px; letter-spacing:-.2px; color:#fff;}
-.ptext{margin:10px 0 0; color:#d9d0c1; font-size:15px; line-height:1.55; white-space:pre-wrap;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
-.card.open .ptext{-webkit-line-clamp:unset; display:block;}
-.card{cursor:pointer;}
-.card:active{transform:scale(.995);}
-.card-foot{display:flex; justify-content:space-between; align-items:center; margin-top:14px;}
+.picbody{position:absolute; left:0; right:0; bottom:0; padding:14px 14px 12px;}
+.picpills{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+.picpills .model-pill,.picpills .tag{font-size:11px; padding:5px 10px;
+  background:rgba(18,12,7,.55); border-color:rgba(232,168,62,.4);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
+.picbody h3{margin:0; font-size:16px; font-weight:800; line-height:1.28; color:#fff; letter-spacing:-.2px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.pictext{margin:7px 0 0; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.78);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+.picfoot{display:flex; margin-top:10px;}
+.minicopy{width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.14); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  color:#fff; display:grid; place-items:center; cursor:pointer;}
+.minicopy:active{transform:scale(.92);}
 .copybtn{background:linear-gradient(135deg,#f6cd6f,#e8a83e); color:#231703; border:0; border-radius:999px;
   padding:11px 22px; font-size:15px; font-weight:800; cursor:pointer;
   box-shadow:0 6px 18px rgba(232,168,62,.28);}
@@ -498,27 +503,21 @@ function render(){
     }
   }
   listEl.innerHTML=items.map(p=>{
-    if(p.img){
-      return '<article class="card pic" data-id="'+p.id+'">'
-        +'<div class="picwrap"><img loading="lazy" src="'+esc(p.img)+'" alt="">'
-        +'<button class="icon-btn star'+(p.fav?' on':'')+'" data-act="fav" aria-label="В избранное">★</button></div>'
-        +'<h3>'+esc(p.name)+'</h3>'
-        +(p.category?'<div class="meta"><span class="model-pill">'+esc(p.category)+'</span></div>':'')
-        +'</article>';
-    }
+    const src=p.img?esc(p.img):'img/card-placeholder.jpg';
+    const pills=(p.category?'<span class="model-pill">'+esc(p.category)+'</span>':'')
+      +((p.tags||[]).slice(0,2).map(t=>'<span class="tag">'+esc(t)+'</span>').join(''));
     return '<article class="card" data-id="'+p.id+'">'
-      +'<div class="card-head"><h3>'+esc(p.name)+'</h3>'
-      +'<button class="icon-btn star'+(p.fav?' on':'')+'" data-act="fav" aria-label="В избранное">★</button></div>'
-      +'<p class="ptext">'+esc(p.text)+'</p>'
-      +((p.category||(p.tags&&p.tags.length))?'<div class="meta">'
-        +(p.category?'<span class="model-pill">'+esc(p.category)+'</span>':'')
-        +((p.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(''))
-        +'</div>':'')
-      +'<div class="card-foot"><button class="copybtn" data-act="copy">Копировать</button>'
-      +'<div class="row-btns">'
-      +'<button class="icon-btn" data-act="edit" aria-label="Редактировать">'+pencil+'</button>'
-      +'<button class="icon-btn danger" data-act="del" aria-label="Удалить">'+trash+'</button>'
-      +'</div></div></article>';
+      +'<img loading="lazy" src="'+src+'" alt="">'
+      +'<div class="picshade"></div>'
+      +'<button class="icon-btn star'+(p.fav?' on':'')+'" data-act="fav" aria-label="В избранное">★</button>'
+      +'<div class="picbody">'
+      +(pills?'<div class="picpills">'+pills+'</div>':'')
+      +'<h3>'+esc(p.name)+'</h3>'
+      +'<p class="pictext">'+esc(p.text)+'</p>'
+      +'<div class="picfoot"><button class="minicopy" data-act="copy" aria-label="Копировать">'
+      +'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+      +'</button></div>'
+      +'</div></article>';
   }).join('');
 }
 
@@ -530,16 +529,6 @@ listEl.addEventListener('click',e=>{
   const act=btn.dataset.act;
   if(act==='copy')copyText(p.text);
   else if(act==='fav'){p.fav=!p.fav; save(); render();}
-  else if(act==='edit')openSheet(p);
-  else if(act==='del'){
-    if(btn.dataset.arm){
-      db.prompts=db.prompts.filter(x=>x.id!==p.id);
-      save(); render(); toast('Промпт удалён');
-    }else{
-      btn.dataset.arm='1'; btn.classList.add('arm'); btn.innerHTML='Точно?';
-      setTimeout(render,2600);
-    }
-  }
 });
 
 /* ---------- экран просмотра ---------- */
