@@ -92,6 +92,16 @@ button{font-family:inherit;}
   background:transparent; color:var(--gold-soft, #e9c87e); font-size:13.5px; cursor:pointer; font-family:inherit;}
 .catchip:active{transform:scale(.95);}
 .catchip.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703; font-weight:700;}
+.catfilter{display:flex; gap:8px; overflow-x:auto; margin:16px -20px 0; padding:2px 20px 8px;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+.catfilter::-webkit-scrollbar{display:none;}
+.catfilter .catchip{flex:none;}
+.catchip .cx{margin-left:8px; opacity:.55; font-size:15px; line-height:1;}
+.catadd{display:flex; gap:8px; margin-top:10px; align-items:center;}
+.sheet .catadd input{margin-top:0; width:auto; flex:1;}
+.catadd button{flex:none; width:54px; height:54px; border-radius:18px; border:0; cursor:pointer;
+  background:linear-gradient(135deg,#f6cd6f,#e8a83e); color:#231703; font-size:26px; line-height:1;}
+.catadd button:active{transform:scale(.94);}
 .cloud-btn{width:58px; height:58px; flex:none; border-radius:20px; border:1px solid rgba(255,255,255,.11);
   background:rgba(255,255,255,.07); color:rgba(243,237,227,.5);
   display:grid; place-items:center; cursor:pointer;}
@@ -315,6 +325,7 @@ body.lock{overflow:hidden;}
     </div>
   </div>
   <p class="count" id="count"></p>
+  <div class="catfilter" id="catFilter"></div>
 
   <div id="list"></div>
 
@@ -368,6 +379,10 @@ body.lock{overflow:hidden;}
         <option value="Животные"></option>
       </datalist>
       <div class="catchips" id="catChips"></div>
+      <div class="catadd">
+        <input id="fCatNew" placeholder="Своя категория…" autocomplete="off">
+        <button type="button" id="fCatAdd" aria-label="Добавить категорию">+</button>
+      </div>
     </label>
     <label>Текст промпта
       <textarea id="fText" rows="6" placeholder="Вставь или напиши свой промпт…"></textarea>
@@ -402,6 +417,7 @@ const onboard=$('onboard'), app=$('app'),
 const LS='myprompts.v1';
 let db={prompts:[],onboarded:false};
 try{const raw=localStorage.getItem(LS); if(raw) db=Object.assign(db,JSON.parse(raw));}catch(e){}
+if(!Array.isArray(db.customCats))db.customCats=[];
 db.prompts.forEach(p=>{ if(!p.category&&p.model)p.category=p.model; delete p.model; if(!Array.isArray(p.tags))p.tags=[]; });
 const saveLocal=()=>{try{localStorage.setItem(LS,JSON.stringify(db));}catch(e){}};
 const save=()=>{db.savedAt=Date.now(); saveLocal(); schedulePush();};
@@ -512,26 +528,76 @@ const overlay=$('overlay'), fName=$('fName'), fText=$('fText'),
       fImgFile=$('fImgFile'), fImgUrl=$('fImgUrl'), fImgPrev=$('fImgPrev'), fImgDel=$('fImgDel');
 let editing=null;
 
-/* ---------- пресеты категорий ---------- */
+/* ---------- категории ---------- */
 const CAT_PRESETS=['Портрет','Мода','Спорт','Еда','Абстракция','Предметы','Природа','Животные'];
-const catChips=$('catChips');
-CAT_PRESETS.forEach(c=>{
-  const b=document.createElement('button');
-  b.type='button'; b.className='catchip'; b.textContent=c;
-  b.addEventListener('click',()=>{fModel.value=c; markChips();});
-  catChips.appendChild(b);
-});
+const catChips=$('catChips'), catFilter=$('catFilter');
+let activeCat=null;
+function allCats(){
+  const out=[], seen=new Set();
+  [...CAT_PRESETS,...(db.customCats||[])].forEach(c=>{c=String(c||'').trim(); if(c&&!seen.has(c)){seen.add(c); out.push(c);}});
+  return out;
+}
+function buildCatChips(){
+  catChips.innerHTML='';
+  allCats().forEach(c=>{
+    const custom=!CAT_PRESETS.includes(c);
+    const b=document.createElement('button');
+    b.type='button'; b.className='catchip'; b.dataset.cat=c;
+    b.innerHTML=esc(c)+(custom?'<span class="cx">×</span>':'');
+    b.addEventListener('click',e=>{
+      if(custom&&e.target.closest('.cx')){
+        db.customCats=(db.customCats||[]).filter(x=>x!==c);
+        if(activeCat===c)activeCat=null;
+        save(); buildCatChips(); renderCatFilter(); render();
+        return;
+      }
+      fModel.value=c; markChips();
+    });
+    catChips.appendChild(b);
+  });
+  markChips();
+}
 function markChips(){
   const v=fModel.value.trim();
-  [...catChips.children].forEach(b=>b.classList.toggle('on',b.textContent===v));
+  [...catChips.children].forEach(b=>b.classList.toggle('on',b.dataset.cat===v));
+}
+function renderCatFilter(){
+  if(activeCat&&!allCats().includes(activeCat))activeCat=null;
+  catFilter.innerHTML='';
+  const mk=(label,val)=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='catchip'+(val===activeCat?' on':'');
+    b.textContent=label;
+    b.addEventListener('click',()=>{
+      activeCat=(activeCat===val)?null:val;
+      renderCatFilter(); render();
+    });
+    catFilter.appendChild(b);
+  };
+  mk('Все',null);
+  allCats().forEach(c=>mk(c,c));
 }
 fModel.addEventListener('input',markChips);
+$('fCatAdd').addEventListener('click',()=>{
+  const v=$('fCatNew').value.trim();
+  if(!v)return;
+  if(!allCats().includes(v)){
+    db.customCats=[...(db.customCats||[]),v];
+    save();
+  }
+  $('fCatNew').value='';
+  fModel.value=v;
+  buildCatChips(); renderCatFilter(); render();
+  toast('Категория добавлена');
+});
+buildCatChips(); renderCatFilter();
 
 function render(){
   const query=q.value.trim().toLowerCase();
   const items=[...db.prompts]
     .sort((a,b)=>b.createdAt-a.createdAt)
     .filter(p=>!favOnly||p.fav)
+    .filter(p=>!activeCat||p.category===activeCat)
     .filter(p=>!query||p.name.toLowerCase().includes(query));
   countEl.textContent=db.prompts.length
     ? db.prompts.length+' '+plural(db.prompts.length,'промпт','промпта','промптов')
@@ -543,6 +609,9 @@ function render(){
       addFirstBtn.style.display='';
     }else if(favOnly){
       emptyText.textContent='Пока нет ничего в избранном';
+      addFirstBtn.style.display='none';
+    }else if(activeCat){
+      emptyText.textContent='В категории «'+activeCat+'» пока пусто';
       addFirstBtn.style.display='none';
     }else{
       emptyText.textContent='Ничего не найдено';
@@ -692,7 +761,8 @@ async function drivePull(){
       const rTime=remote.updatedAt||0, lTime=db.savedAt||0;
       if(remote&&Array.isArray(remote.prompts)&&rTime>lTime){
         db.prompts=remote.prompts; db.onboarded=!!remote.onboarded; db.savedAt=rTime;
-        saveLocal(); render(); toast('Данные восстановлены с Диска');
+        db.customCats=Array.isArray(remote.customCats)?remote.customCats:[];
+        saveLocal(); buildCatChips(); renderCatFilter(); render(); toast('Данные восстановлены с Диска');
         setStatus('Синхронизировано '+fmtTime(rTime));
       }else if(lTime>rTime){
         await drivePushNow();
@@ -707,7 +777,7 @@ async function drivePull(){
 }
 async function drivePushNow(){
   if(!gToken)return;
-  const payload={v:1,updatedAt:Date.now(),onboarded:db.onboarded,prompts:db.prompts};
+  const payload={v:1,updatedAt:Date.now(),onboarded:db.onboarded,prompts:db.prompts,customCats:db.customCats||[]};
   const body=JSON.stringify(payload);
   if(!driveFileId)driveFileId=await driveFind();
   if(driveFileId){
