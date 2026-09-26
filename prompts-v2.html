@@ -851,9 +851,13 @@ async function driveApi(path,opts,retried){
   opts=opts||{};
   if(!gToken)throw new Error('auth');
   opts.headers=Object.assign({'Authorization':'Bearer '+gToken},opts.headers||{});
+  const ctrl=new AbortController();
+  const to=setTimeout(()=>ctrl.abort(),20000);
+  opts.signal=ctrl.signal;
   let r;
   try{r=await fetch('https://www.googleapis.com/'+path,opts);}
   catch(e){throw new Error('net');}
+  finally{clearTimeout(to);}
   if(r.status===401&&!retried){
     gToken=await gRefresh();
     if(gToken)return driveApi(path,opts,true);
