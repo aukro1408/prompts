@@ -46,28 +46,17 @@ button{font-family:inherit;}
 /* ============ ОСНОВНОЙ ЭКРАН: hero-шапка ============ */
 #app{max-width:640px; margin:0 auto; padding:22px 18px 120px;}
 #app[hidden]{display:none;}
-.hero{position:relative; border-radius:28px; overflow:hidden;
-  min-height:238px; display:flex; flex-direction:column; justify-content:space-between;
+.hero{position:relative; overflow:hidden; margin:-22px -18px 0; border-radius:0 0 30px 30px;
+  min-height:250px; display:flex; align-items:flex-end;
   box-shadow:0 14px 34px rgba(20,10,0,.28);}
 .hero-bg{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;}
 .hero::after{content:""; position:absolute; inset:0;
   background:linear-gradient(100deg, rgba(8,5,2,.74) 0%, rgba(8,5,2,.38) 46%, rgba(8,5,2,0) 72%);}
-.hero-top{position:relative; z-index:1; display:flex; justify-content:space-between; padding:14px;}
-.hbtn{width:46px; height:46px; border-radius:15px; border:0; cursor:pointer;
-  background:rgba(20,14,8,.5); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-  display:grid; place-items:center;}
-.hbtn:active{transform:scale(.94);}
-.hero-titles{position:relative; z-index:1; padding:6px 22px 46px;}
+.hero-titles{position:relative; z-index:1; padding:0 24px 34px;}
 .hero-titles h2{margin:0; color:#fff; font-size:40px; line-height:1.04; letter-spacing:-.5px; font-weight:800;}
 .hero-titles h2 span{color:var(--gold);}
 .hero-titles p{margin:8px 0 0; color:rgba(255,255,255,.75); font-size:14.5px;}
-.menu-pop{position:absolute; z-index:2; top:70px; left:14px; background:#fff; border-radius:16px;
-  box-shadow:0 14px 34px rgba(0,0,0,.25); padding:6px; min-width:210px;}
-.menu-pop[hidden]{display:none;}
-.menu-pop button{display:block; width:100%; text-align:left; border:0; background:none; cursor:pointer;
-  padding:12px 14px; font-size:15px; font-weight:600; border-radius:10px; color:var(--ink); font-family:inherit;}
-.menu-pop button:active{background:#f1f1f4;}
-.searchrow{position:relative; z-index:1; display:flex; gap:10px; margin:-26px 12px 0;}
+.searchrow{display:flex; gap:10px; margin:18px 0 0;}
 .search{flex:1; display:flex; align-items:center; gap:10px; background:#fff; border-radius:20px;
   padding:15px 18px; box-shadow:0 10px 26px rgba(0,0,0,.12);}
 .search input{border:0; outline:0; font-size:16px; width:100%; background:transparent; color:var(--ink); font-family:inherit;}
@@ -200,20 +189,9 @@ body.lock{overflow:hidden;}
 <section id="app" hidden>
   <header class="hero">
     <img class="hero-bg" src="img/hero-banner.jpg" alt="">
-    <div class="hero-top">
-      <button class="hbtn" id="menuBtn" aria-label="Меню">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
-      <button class="hbtn" id="findBtn" aria-label="Поиск">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      </button>
-    </div>
     <div class="hero-titles">
       <h2>Мои<br><span>промпты</span></h2>
       <p>Твои идеи всегда под рукой</p>
-    </div>
-    <div class="menu-pop" id="menuPop" hidden>
-      <button id="peek">Показать приветствие</button>
     </div>
   </header>
 
@@ -343,24 +321,9 @@ function resetSlider(){
   knob.style.transition='';
   label.textContent='Проведи, чтобы войти'; label.style.opacity='1';
 }
-$('peek').addEventListener('click',()=>{
-  $('menuPop').hidden=true;
-  resetSlider();
-  onboard.hidden=false;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>onboard.classList.remove('leave')));
-});
-
-/* ---------- hero-шапка: меню, поиск, фильтр ---------- */
-const menuBtn=$('menuBtn'), menuPop=$('menuPop'), findBtn=$('findBtn'), favBtn=$('favBtn');
+/* ---------- фильтр избранного ---------- */
+const favBtn=$('favBtn');
 let favOnly=false;
-menuBtn.addEventListener('click',e=>{e.stopPropagation(); menuPop.hidden=!menuPop.hidden;});
-document.addEventListener('click',e=>{
-  if(!menuPop.hidden&&!e.target.closest('#menuPop')&&!e.target.closest('#menuBtn'))menuPop.hidden=true;
-});
-findBtn.addEventListener('click',()=>{
-  q.scrollIntoView({behavior:'smooth',block:'center'});
-  setTimeout(()=>q.focus(),350);
-});
 favBtn.addEventListener('click',()=>{
   favOnly=!favOnly; favBtn.classList.toggle('on',favOnly); render();
 });
