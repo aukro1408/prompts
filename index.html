@@ -230,7 +230,7 @@ body.lock{overflow:hidden;}
 
   <div id="empty" hidden>
     <img class="empty-hero" src="img/hero2.png" alt="">
-    <div>Пока нет ни одного промпта —<br>самое время добавить первый</div>
+    <div id="emptyText">Пока нет ни одного промпта —<br>самое время добавить первый</div>
     <button class="btn primary" id="addFirst">Добавить промпт</button>
   </div>
   </div>
@@ -368,7 +368,8 @@ function copyText(t){
 }
 
 /* ---------- список ---------- */
-const listEl=$('list'), emptyEl=$('empty'), q=$('q'), countEl=$('count');
+const listEl=$('list'), emptyEl=$('empty'), emptyText=$('emptyText'), addFirstBtn=$('addFirst'),
+      q=$('q'), countEl=$('count');
 const overlay=$('overlay'), fName=$('fName'), fText=$('fText'),
       fModel=$('fModel'), fTags=$('fTags'), sheetTitle=$('sheetTitle');
 let editing=null;
@@ -383,6 +384,18 @@ function render(){
     ? db.prompts.length+' '+plural(db.prompts.length,'промпт','промпта','промптов')
     : 'пока пусто';
   emptyEl.hidden=items.length>0;
+  if(!items.length){
+    if(!db.prompts.length){
+      emptyText.innerHTML='Пока нет ни одного промпта —<br>самое время добавить первый';
+      addFirstBtn.style.display='';
+    }else if(favOnly){
+      emptyText.textContent='Пока нет ничего в избранном';
+      addFirstBtn.style.display='none';
+    }else{
+      emptyText.textContent='Ничего не найдено';
+      addFirstBtn.style.display='none';
+    }
+  }
   listEl.innerHTML=items.map(p=>{
     const long=p.text.length>160;
     return '<article class="card" data-id="'+p.id+'">'
