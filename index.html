@@ -97,8 +97,8 @@ button{font-family:inherit;}
 .ptext{margin:10px 0 0; color:#d9d0c1; font-size:15px; line-height:1.55; white-space:pre-wrap;
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
 .card.open .ptext{-webkit-line-clamp:unset; display:block;}
-.more{background:none; border:0; color:var(--gold); font-weight:700; font-size:14px;
-  margin-top:8px; padding:0; text-decoration:underline; cursor:pointer;}
+.card{cursor:pointer;}
+.card:active{transform:scale(.995);}
 .card-foot{display:flex; justify-content:space-between; align-items:center; margin-top:14px;}
 .copybtn{background:linear-gradient(135deg,#f6cd6f,#e8a83e); color:#231703; border:0; border-radius:999px;
   padding:11px 22px; font-size:15px; font-weight:800; cursor:pointer;
@@ -128,6 +128,25 @@ button{font-family:inherit;}
 #empty{text-align:center; padding:64px 20px; color:rgba(243,237,227,.55); font-size:15px;}
 #empty .btn{flex:none; padding:14px 28px; margin-top:18px;}
 #empty .btn.primary{background:linear-gradient(135deg,#f6cd6f,#e8a83e); color:#231703;}
+
+/* ============ ЭКРАН ПРОСМОТРА ============ */
+#detail{max-width:640px; margin:0 auto; min-height:100dvh; color:#f3ede3; padding:22px 22px 120px;
+  background:
+    radial-gradient(110% 30% at 50% 0%, rgba(232,168,62,.13), rgba(232,168,62,0) 62%),
+    #131009;}
+#detail[hidden]{display:none;}
+.dback{width:50px; height:50px; border-radius:16px; border:1px solid rgba(255,255,255,.11);
+  background:rgba(255,255,255,.07); color:#f3ede3; display:grid; place-items:center; cursor:pointer;
+  margin-bottom:24px;}
+.dback:active{transform:scale(.94);}
+#detail .meta{margin:0 0 14px;}
+#detailTitle{margin:0 0 18px; font-size:30px; line-height:1.15; letter-spacing:-.4px; color:#fff; font-weight:800;}
+.detail-text{margin:0; font-size:16.5px; line-height:1.7; color:#d9d0c1; white-space:pre-wrap;}
+.detail-foot{margin-top:30px; display:flex; flex-direction:column; gap:16px;}
+.copybtn.big{width:100%; padding:17px; font-size:17px;}
+.detail-foot .row-btns{display:flex; gap:10px; justify-content:center;}
+.detail-foot .icon-btn{width:54px; height:54px;}
+.detail-foot .star{font-size:26px;}
 
 /* шторка добавления */
 .overlay{position:fixed; inset:0; z-index:60; background:rgba(10,10,14,.45);
@@ -248,6 +267,24 @@ body.lock{overflow:hidden;}
   </div>
 
   <button id="fab" aria-label="Добавить промпт">+</button>
+</section>
+
+<!-- ЭКРАН ПРОСМОТРА -->
+<section id="detail" hidden>
+  <button class="dback" id="detailBack" aria-label="Назад">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <div class="meta" id="detailMeta"></div>
+  <h1 id="detailTitle"></h1>
+  <p class="detail-text" id="detailText"></p>
+  <div class="detail-foot">
+    <button class="copybtn big" id="detailCopy">Копировать</button>
+    <div class="row-btns">
+      <button class="icon-btn star" id="detailFav" aria-label="В избранное">★</button>
+      <button class="icon-btn" id="detailEdit" aria-label="Редактировать"></button>
+      <button class="icon-btn danger" id="detailDel" aria-label="Удалить"></button>
+    </div>
+  </div>
 </section>
 
 <!-- ШТОРКА -->
@@ -426,12 +463,10 @@ function render(){
     }
   }
   listEl.innerHTML=items.map(p=>{
-    const long=p.text.length>160;
     return '<article class="card" data-id="'+p.id+'">'
       +'<div class="card-head"><h3>'+esc(p.name)+'</h3>'
       +'<button class="icon-btn star'+(p.fav?' on':'')+'" data-act="fav" aria-label="В избранное">★</button></div>'
       +'<p class="ptext">'+esc(p.text)+'</p>'
-      +(long?'<button class="more" data-act="more">Показать полностью</button>':'')
       +((p.category||(p.tags&&p.tags.length))?'<div class="meta">'
         +(p.category?'<span class="model-pill">'+esc(p.category)+'</span>':'')
         +((p.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(''))
@@ -445,16 +480,13 @@ function render(){
 }
 
 listEl.addEventListener('click',e=>{
-  const btn=e.target.closest('[data-act]'); if(!btn)return;
   const card=e.target.closest('.card'); if(!card)return;
   const p=db.prompts.find(x=>x.id===card.dataset.id); if(!p)return;
+  const btn=e.target.closest('[data-act]');
+  if(!btn){openDetail(p.id); return;}
   const act=btn.dataset.act;
   if(act==='copy')copyText(p.text);
   else if(act==='fav'){p.fav=!p.fav; save(); render();}
-  else if(act==='more'){
-    const open=card.classList.toggle('open');
-    btn.textContent=open?'Скрыть':'Показать полностью';
-  }
   else if(act==='edit')openSheet(p);
   else if(act==='del'){
     if(btn.dataset.arm){
@@ -464,6 +496,42 @@ listEl.addEventListener('click',e=>{
       btn.dataset.arm='1'; btn.classList.add('arm'); btn.innerHTML='Точно?';
       setTimeout(render,2600);
     }
+  }
+});
+
+/* ---------- экран просмотра ---------- */
+const detail=$('detail'), detailMeta=$('detailMeta'), detailTitle=$('detailTitle'),
+      detailText=$('detailText'), detailCopy=$('detailCopy'), detailFav=$('detailFav'),
+      detailEdit=$('detailEdit'), detailDel=$('detailDel');
+detailEdit.innerHTML=pencil; detailDel.innerHTML=trash;
+let detailId=null;
+function openDetail(id){
+  const p=db.prompts.find(x=>x.id===id); if(!p)return;
+  detailId=id;
+  const meta=(p.category?'<span class="model-pill">'+esc(p.category)+'</span>':'')
+    +((p.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(''));
+  detailMeta.innerHTML=meta;
+  detailMeta.style.display=meta?'flex':'none';
+  detailTitle.textContent=p.name;
+  detailText.textContent=p.text;
+  detailFav.classList.toggle('on',!!p.fav);
+  detailDel.classList.remove('arm'); detailDel.dataset.arm=''; detailDel.innerHTML=trash;
+  app.hidden=true; detail.hidden=false; scrollTo(0,0);
+}
+function closeDetail(){detailId=null; detail.hidden=true; app.hidden=false;}
+$('detailBack').addEventListener('click',closeDetail);
+detailCopy.addEventListener('click',()=>{const p=db.prompts.find(x=>x.id===detailId); if(p)copyText(p.text);});
+detailFav.addEventListener('click',()=>{const p=db.prompts.find(x=>x.id===detailId); if(!p)return;
+  p.fav=!p.fav; save(); render(); detailFav.classList.toggle('on',p.fav);});
+detailEdit.addEventListener('click',()=>{const p=db.prompts.find(x=>x.id===detailId); if(p)openSheet(p);});
+detailDel.addEventListener('click',()=>{
+  const p=db.prompts.find(x=>x.id===detailId); if(!p)return;
+  if(detailDel.dataset.arm){
+    db.prompts=db.prompts.filter(x=>x.id!==p.id);
+    save(); render(); closeDetail(); toast('Промпт удалён');
+  }else{
+    detailDel.dataset.arm='1'; detailDel.classList.add('arm'); detailDel.textContent='Точно?';
+    setTimeout(()=>{if(detailId===p.id){detailDel.classList.remove('arm'); detailDel.dataset.arm=''; detailDel.innerHTML=trash;}},2600);
   }
 });
 
@@ -505,7 +573,9 @@ $('saveBtn').addEventListener('click',()=>{
   }else{
     db.prompts.push({id:uid(),name:name,text:text,category:category,tags:tags,fav:false,createdAt:Date.now()});
   }
-  save(); render(); closeSheet(); toast('Сохранено');
+  save(); render();
+  if(detailId&&!detail.hidden)openDetail(detailId);
+  closeSheet(); toast('Сохранено');
 });
 q.addEventListener('input',render);
 
