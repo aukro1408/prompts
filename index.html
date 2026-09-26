@@ -74,7 +74,7 @@ button{font-family:inherit;}
   text-shadow:0 2px 18px rgba(0,0,0,.4);}
 .hero-titles h2 span{color:var(--gold);}
 .hero-titles p{margin:9px 0 0; color:rgba(255,255,255,.72); font-size:14.5px;}
-.searchrow{display:flex; gap:10px; margin:20px 0 0;}
+.searchrow{display:flex; gap:10px; margin:20px 0 0; position:relative;}
 .search{flex:1; display:flex; align-items:center; gap:10px;
   background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.11); border-radius:20px;
   padding:15px 18px;}
@@ -87,6 +87,22 @@ button{font-family:inherit;}
 .fav-filter svg{fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round;}
 .fav-filter.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703;}
 .fav-filter.on svg{fill:#231703; stroke:#231703;}
+.cloud-btn{width:58px; height:58px; flex:none; border-radius:20px; border:1px solid rgba(255,255,255,.11);
+  background:rgba(255,255,255,.07); color:rgba(243,237,227,.5);
+  display:grid; place-items:center; cursor:pointer;}
+.cloud-btn:active{transform:scale(.94);}
+.cloud-btn.on{color:var(--gold); border-color:rgba(232,168,62,.45);}
+.cloud-btn.busy{animation:cloudpulse 1.1s ease-in-out infinite;}
+@keyframes cloudpulse{50%{opacity:.4;}}
+.sync-panel{position:absolute; top:68px; right:0; z-index:50; width:250px;
+  background:#1d1712; border:1px solid rgba(232,168,62,.3); border-radius:18px;
+  padding:14px; box-shadow:0 18px 44px rgba(0,0,0,.5);}
+.sync-panel[hidden]{display:none;}
+.sync-status{font-size:13.5px; color:rgba(243,237,227,.78); margin-bottom:12px; line-height:1.45;}
+.sync-action{display:block; width:100%; padding:12px; border-radius:14px; border:0; cursor:pointer;
+  font-size:14.5px; font-weight:700; font-family:inherit;
+  background:linear-gradient(135deg,#f6cd6f,#e8a83e); color:#231703; margin-bottom:8px;}
+.sync-action.dim{background:rgba(255,255,255,.08); color:#ff9a8a; margin-bottom:0;}
 .count{margin:14px 4px 16px; color:rgba(243,237,227,.48); font-size:14px;}
 
 #list{display:flex; flex-wrap:wrap; gap:14px;}
@@ -238,6 +254,7 @@ body.lock{overflow:hidden;}
   *{animation:none !important; transition:none !important;}
 }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -283,6 +300,14 @@ body.lock{overflow:hidden;}
     <button class="fav-filter" id="favBtn" aria-label="Только избранное">
       <svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 2.6l2.85 5.9 6.45.85-4.75 4.5 1.2 6.35-5.75-3.1-5.75 3.1 1.2-6.35L2.7 9.35l6.45-.85z"/></svg>
     </button>
+    <button class="cloud-btn" id="cloudBtn" aria-label="Синхронизация с Google Диском">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+    </button>
+    <div class="sync-panel" id="syncPanel" hidden>
+      <div class="sync-status" id="syncStatus">Не подключено</div>
+      <button class="sync-action" id="syncNowBtn">Синхронизировать сейчас</button>
+      <button class="sync-action dim" id="syncLogoutBtn">Выйти</button>
+    </div>
   </div>
   <p class="count" id="count"></p>
 
@@ -372,7 +397,8 @@ const LS='myprompts.v1';
 let db={prompts:[],onboarded:false};
 try{const raw=localStorage.getItem(LS); if(raw) db=Object.assign(db,JSON.parse(raw));}catch(e){}
 db.prompts.forEach(p=>{ if(!p.category&&p.model)p.category=p.model; delete p.model; if(!Array.isArray(p.tags))p.tags=[]; });
-const save=()=>{try{localStorage.setItem(LS,JSON.stringify(db));}catch(e){}};
+const saveLocal=()=>{try{localStorage.setItem(LS,JSON.stringify(db));}catch(e){}};
+const save=()=>{db.savedAt=Date.now(); saveLocal(); schedulePush();};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const uid=()=>'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const plural=(n,a,b,c)=>{n=Math.abs(n)%100;const d=n%10;if(n>10&&n<20)return c;if(d>1&&d<5)return b;if(d===1)return a;return c;};
@@ -570,6 +596,117 @@ detailDel.addEventListener('click',()=>{
     setTimeout(()=>{if(detailId===p.id){detailDel.classList.remove('arm'); detailDel.dataset.arm=''; detailDel.innerHTML=trash;}},2600);
   }
 });
+
+/* ---------- Google Drive sync ---------- */
+const GOOGLE_CLIENT_ID='PASTE_CLIENT_ID_HERE';
+const CLOUD_ON=GOOGLE_CLIENT_ID.indexOf('PASTE_')!==0;
+const cloudBtn=$('cloudBtn'), syncPanel=$('syncPanel'), syncStatus=$('syncStatus');
+let gToken=null, tokenClient=null, syncTimer=null, driveFileId=null;
+
+function setCloudUI(on){
+  cloudBtn.classList.toggle('on',on);
+  if(!on)syncPanel.hidden=true;
+  syncStatus.textContent=on?'Подключено к Google Диску':'Не подключено';
+}
+function setBusy(b){cloudBtn.classList.toggle('busy',b);}
+function setStatus(t){syncStatus.textContent=t;}
+function fmtTime(t){try{return new Date(t).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
+
+function gInit(){
+  if(!CLOUD_ON||!window.google||!window.google.accounts||!window.google.accounts.oauth2)return;
+  tokenClient=google.accounts.oauth2.initTokenClient({
+    client_id:GOOGLE_CLIENT_ID,
+    scope:'https://www.googleapis.com/auth/drive.appdata',
+    callback:onToken,
+  });
+  try{tokenClient.requestAccessToken({prompt:''});}catch(e){}
+}
+function onToken(resp){
+  if(resp&&resp.access_token){gToken=resp.access_token; setCloudUI(true); drivePull();}
+  else setCloudUI(false);
+}
+let gTries=0;
+const gWait=setInterval(()=>{
+  if(window.google&&window.google.accounts&&window.google.accounts.oauth2){clearInterval(gWait); gInit();}
+  else if(++gTries>60){clearInterval(gWait);}
+},250);
+
+cloudBtn.addEventListener('click',e=>{
+  e.stopPropagation();
+  if(!CLOUD_ON){toast('Синхронизация ещё настраивается'); return;}
+  if(!tokenClient){toast('Google ещё загружается…'); return;}
+  if(gToken){syncPanel.hidden=!syncPanel.hidden;}
+  else{try{tokenClient.requestAccessToken({prompt:'consent'});}catch(err){}}
+});
+document.addEventListener('click',e=>{if(!syncPanel.hidden&&!e.target.closest('.sync-panel'))syncPanel.hidden=true;});
+$('syncNowBtn').addEventListener('click',()=>{syncPanel.hidden=true; if(gToken)drivePull();});
+$('syncLogoutBtn').addEventListener('click',()=>{
+  syncPanel.hidden=true;
+  if(gToken&&window.google&&window.google.accounts){try{google.accounts.oauth2.revoke(gToken,()=>{});}catch(e){}}
+  gToken=null; driveFileId=null; setCloudUI(false); toast('Выход выполнен');
+});
+
+async function driveApi(path,opts){
+  opts=opts||{};
+  opts.headers=Object.assign({'Authorization':'Bearer '+gToken},opts.headers||{});
+  const r=await fetch('https://www.googleapis.com/'+path,opts);
+  if(r.status===401||r.status===403){gToken=null; setCloudUI(false); throw new Error('auth');}
+  if(!r.ok)throw new Error('drive '+r.status);
+  return r;
+}
+async function driveFind(){
+  const q=encodeURIComponent("name='prompts.json' and 'appDataFolder' in parents and trashed=false");
+  const r=await driveApi('drive/v3/files?q='+q+'&spaces=appDataFolder&fields=files(id)&pageSize=1');
+  const j=await r.json();
+  return (j.files&&j.files[0]&&j.files[0].id)||null;
+}
+async function drivePull(){
+  if(!gToken)return;
+  setBusy(true);
+  try{
+    const id=await driveFind();
+    if(id){
+      driveFileId=id;
+      const remote=await (await driveApi('drive/v3/files/'+id+'?alt=media')).json();
+      const rTime=remote.updatedAt||0, lTime=db.savedAt||0;
+      if(remote&&Array.isArray(remote.prompts)&&rTime>lTime){
+        db.prompts=remote.prompts; db.onboarded=!!remote.onboarded; db.savedAt=rTime;
+        saveLocal(); render(); toast('Данные восстановлены с Диска');
+        setStatus('Синхронизировано '+fmtTime(rTime));
+      }else if(lTime>rTime){
+        await drivePushNow();
+      }else{
+        setStatus('Всё уже синхронизировано');
+      }
+    }else{
+      await drivePushNow();
+    }
+  }catch(e){if(e.message!=='auth')setStatus('Ошибка синхронизации');}
+  setBusy(false);
+}
+async function drivePushNow(){
+  if(!gToken)return;
+  const payload={v:1,updatedAt:Date.now(),onboarded:db.onboarded,prompts:db.prompts};
+  const body=JSON.stringify(payload);
+  if(!driveFileId)driveFileId=await driveFind();
+  if(driveFileId){
+    await driveApi('upload/drive/v3/files/'+driveFileId+'?uploadType=media',
+      {method:'PATCH',headers:{'Content-Type':'application/json'},body:body});
+  }else{
+    const fd=new FormData();
+    fd.append('metadata',new Blob([JSON.stringify({name:'prompts.json',parents:['appDataFolder']})],{type:'application/json'}));
+    fd.append('file',new Blob([body],{type:'application/json'}));
+    const j=await (await driveApi('upload/drive/v3/files?uploadType=multipart',{method:'POST',body:fd})).json();
+    driveFileId=j.id;
+  }
+  db.savedAt=payload.updatedAt; saveLocal();
+  setStatus('Синхронизировано '+fmtTime(payload.updatedAt));
+}
+function schedulePush(){
+  if(!gToken||!CLOUD_ON)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>{setBusy(true); drivePushNow().catch(()=>setStatus('Ошибка синхронизации')).finally(()=>setBusy(false));},3000);
+}
 
 /* ---------- шторка ---------- */
 /* ---------- картинка-результат ---------- */
