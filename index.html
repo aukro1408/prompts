@@ -87,6 +87,11 @@ button{font-family:inherit;}
 .fav-filter svg{fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round;}
 .fav-filter.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703;}
 .fav-filter.on svg{fill:#231703; stroke:#231703;}
+.catchips{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+.catchip{padding:9px 15px; border-radius:999px; border:1px solid rgba(232,168,62,.35);
+  background:transparent; color:var(--gold-soft, #e9c87e); font-size:13.5px; cursor:pointer; font-family:inherit;}
+.catchip:active{transform:scale(.95);}
+.catchip.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703; font-weight:700;}
 .cloud-btn{width:58px; height:58px; flex:none; border-radius:20px; border:1px solid rgba(255,255,255,.11);
   background:rgba(255,255,255,.07); color:rgba(243,237,227,.5);
   display:grid; place-items:center; cursor:pointer;}
@@ -351,17 +356,18 @@ body.lock{overflow:hidden;}
       <input id="fName" placeholder="Например, Кинематографичный портрет" autocomplete="off">
     </label>
     <label>Категория
-      <input id="fModel" list="models" placeholder="Например, Фотореализм" autocomplete="off">
+      <input id="fModel" list="models" placeholder="Выбери или напиши свою" autocomplete="off">
       <datalist id="models">
-        <option value="Фотореализм"></option>
         <option value="Портрет"></option>
-        <option value="Пейзаж"></option>
-        <option value="Аниме"></option>
-        <option value="Киберпанк"></option>
-        <option value="Фэнтези"></option>
-        <option value="3D-рендер"></option>
-        <option value="Минимализм"></option>
+        <option value="Мода"></option>
+        <option value="Спорт"></option>
+        <option value="Еда"></option>
+        <option value="Абстракция"></option>
+        <option value="Предметы"></option>
+        <option value="Природа"></option>
+        <option value="Животные"></option>
       </datalist>
+      <div class="catchips" id="catChips"></div>
     </label>
     <label>Текст промпта
       <textarea id="fText" rows="6" placeholder="Вставь или напиши свой промпт…"></textarea>
@@ -505,6 +511,21 @@ const overlay=$('overlay'), fName=$('fName'), fText=$('fText'),
       fModel=$('fModel'), fTags=$('fTags'), sheetTitle=$('sheetTitle'),
       fImgFile=$('fImgFile'), fImgUrl=$('fImgUrl'), fImgPrev=$('fImgPrev'), fImgDel=$('fImgDel');
 let editing=null;
+
+/* ---------- пресеты категорий ---------- */
+const CAT_PRESETS=['Портрет','Мода','Спорт','Еда','Абстракция','Предметы','Природа','Животные'];
+const catChips=$('catChips');
+CAT_PRESETS.forEach(c=>{
+  const b=document.createElement('button');
+  b.type='button'; b.className='catchip'; b.textContent=c;
+  b.addEventListener('click',()=>{fModel.value=c; markChips();});
+  catChips.appendChild(b);
+});
+function markChips(){
+  const v=fModel.value.trim();
+  [...catChips.children].forEach(b=>b.classList.toggle('on',b.textContent===v));
+}
+fModel.addEventListener('input',markChips);
 
 function render(){
   const query=q.value.trim().toLowerCase();
@@ -748,6 +769,7 @@ function openSheet(p){
   sheetTitle.textContent=p?'Редактировать':'Новый промпт';
   fName.value=p?p.name:''; fText.value=p?p.text:'';
   fModel.value=p?(p.category||''):''; fTags.value=p?((p.tags||[]).join(', ')):'';
+  markChips();
   setSheetImg(p&&p.img?p.img:'');
   fText.style.borderColor='';
   overlay.classList.add('show');
