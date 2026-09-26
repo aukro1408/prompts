@@ -100,7 +100,10 @@ button{font-family:inherit;}
 .catchip:active{transform:scale(.95);}
 .catchip.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703; font-weight:700;}
 .catfilter{display:flex; gap:8px; overflow-x:auto; margin:16px -20px 0; padding:2px 20px 8px;
-  scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  --fl:0px; --fr:0px;
+  -webkit-mask-image:linear-gradient(to right,transparent 0,#000 var(--fl),#000 calc(100% - var(--fr)),transparent 100%);
+  mask-image:linear-gradient(to right,transparent 0,#000 var(--fl),#000 calc(100% - var(--fr)),transparent 100%);}
 .catfilter::-webkit-scrollbar{display:none;}
 .catfilter .catchip{flex:none;}
 .catchip .cx{margin-left:8px; opacity:.55; font-size:15px; line-height:1;}
@@ -667,7 +670,16 @@ function renderCatFilter(){
   };
   mk('Все',null);
   allCats().forEach(c=>mk(c,c));
+  updCatFade();
 }
+function updCatFade(){
+  const el=$('catFilter'); if(!el)return;
+  const l=el.scrollLeft>8?'44px':'0px';
+  const r=(el.scrollWidth-el.clientWidth-el.scrollLeft)>8?'44px':'0px';
+  el.style.setProperty('--fl',l); el.style.setProperty('--fr',r);
+}
+$('catFilter').addEventListener('scroll',updCatFade,{passive:true});
+addEventListener('resize',updCatFade);
 fModel.addEventListener('input',markChips);
 $('fCatAdd').addEventListener('click',()=>{
   const v=$('fCatNew').value.trim();
