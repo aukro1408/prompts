@@ -69,11 +69,13 @@ button{font-family:inherit;}
   padding:15px 18px;}
 .search input{border:0; outline:0; font-size:16px; width:100%; background:transparent; color:#fff; font-family:inherit;}
 .search input::placeholder{color:rgba(243,237,227,.38);}
-.filter-btn{width:58px; height:58px; flex:none; border-radius:20px; border:1px solid rgba(255,255,255,.11);
-  background:rgba(255,255,255,.07); color:#f3ede3;
+.fav-filter{width:58px; height:58px; flex:none; border-radius:20px; border:1px solid rgba(255,255,255,.11);
+  background:rgba(255,255,255,.07); color:rgba(243,237,227,.5);
   display:grid; place-items:center; cursor:pointer;}
-.filter-btn:active{transform:scale(.94);}
-.filter-btn.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703;}
+.fav-filter:active{transform:scale(.94);}
+.fav-filter svg{fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round;}
+.fav-filter.on{background:linear-gradient(135deg,#f6cd6f,#e8a83e); border-color:transparent; color:#231703;}
+.fav-filter.on svg{fill:#231703; stroke:#231703;}
 .count{margin:14px 4px 16px; color:rgba(243,237,227,.48); font-size:14px;}
 
 .card{background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.09);
@@ -218,8 +220,8 @@ body.lock{overflow:hidden;}
       </svg>
       <input id="q" placeholder="Поиск по названию..." autocomplete="off">
     </div>
-    <button class="filter-btn" id="favBtn" aria-label="Только избранное">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></svg>
+    <button class="fav-filter" id="favBtn" aria-label="Только избранное">
+      <svg width="26" height="26" viewBox="0 0 24 24"><path d="M12 2.6l2.85 5.9 6.45.85-4.75 4.5 1.2 6.35-5.75-3.1-5.75 3.1 1.2-6.35L2.7 9.35l6.45-.85z"/></svg>
     </button>
   </div>
   <p class="count" id="count"></p>
