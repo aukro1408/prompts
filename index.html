@@ -241,6 +241,7 @@ body.lock{overflow:hidden;}
   font-size:15px; font-weight:600; opacity:0; pointer-events:none; transition:.3s; z-index:70;
   max-width:90vw; text-align:center;}
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+#toast.err{background:#3a1414; color:#ffc9c9; border:1px solid rgba(255,120,120,.4);}
 
 /* ===== вариант 2: красивое приветствие ===== */
 #onboard{--wave:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='768' height='900' viewBox='0 0 768 900'%3E%3Cpath d='M0,0H768V790C690,822 630,764 550,792C470,820 410,770 330,796C250,822 170,772 90,798C55,808 25,802 0,796Z' fill='white'/%3E%3C/svg%3E");}
@@ -502,8 +503,12 @@ favBtn.addEventListener('click',()=>{
 /* ---------- тост ---------- */
 let toastT=null;
 function toast(msg){
-  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  const t=$('toast'); t.textContent=msg; t.classList.add('show'); t.classList.remove('err');
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800);
+}
+function toastErr(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show'); t.classList.add('err');
+  clearTimeout(toastT); toastT=setTimeout(()=>{t.classList.remove('show'); t.classList.remove('err');},7000);
 }
 function copyText(t){
   const done=()=>toast('Промпт скопирован');
@@ -732,15 +737,20 @@ async function gExchange(code){
   let verifier=''; try{verifier=sessionStorage.getItem('pkce_v')||'';}catch(e){}
   const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,code:code,code_verifier:verifier,
     grant_type:'authorization_code',redirect_uri:REDIRECT_URI});
-  let j={};
+  let j={}, http=0;
   try{
     const r=await fetch('https://oauth2.googleapis.com/token',
       {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});
+    http=r.status;
     j=await r.json();
-  }catch(e){}
+  }catch(e){ j={error:'network'}; }
   try{history.replaceState(null,'',REDIRECT_URI);}catch(e){}
-  if(j.refresh_token){try{localStorage.setItem('gdrive_rt',j.refresh_token);}catch(e){}}
-  return j.access_token||null;
+  if(j.access_token){
+    if(j.refresh_token){try{localStorage.setItem('gdrive_rt',j.refresh_token);}catch(e){}}
+    return j.access_token;
+  }
+  toastErr('Вход не удался: '+(j.error_description||j.error||('http '+http)));
+  return null;
 }
 async function gRefresh(){
   let rt=null; try{rt=localStorage.getItem('gdrive_rt');}catch(e){}
