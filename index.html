@@ -269,7 +269,6 @@ body.lock{overflow:hidden;}
   *{animation:none !important; transition:none !important;}
 }
 </style>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -687,11 +686,13 @@ detailDel.addEventListener('click',()=>{
   }
 });
 
-/* ---------- Google Drive sync ---------- */
+/* ---------- Google Drive sync (PKCE: вход запоминается) ---------- */
 const GOOGLE_CLIENT_ID='473641590554-ucq89mp3udsj552efp0cnbsmofqf1v8r.apps.googleusercontent.com';
-const CLOUD_ON=GOOGLE_CLIENT_ID.indexOf('PASTE_')!==0;
+const REDIRECT_URI='https://aukro1408.github.io/prompts/';
+const G_SCOPE='https://www.googleapis.com/auth/drive.appdata';
+const CLOUD_ON=true;
 const cloudBtn=$('cloudBtn'), syncPanel=$('syncPanel'), syncStatus=$('syncStatus');
-let gToken=null, tokenClient=null, syncTimer=null, driveFileId=null;
+let gToken=null, syncTimer=null, driveFileId=null;
 
 function setCloudUI(on){
   cloudBtn.classList.toggle('on',on);
@@ -702,44 +703,105 @@ function setBusy(b){cloudBtn.classList.toggle('busy',b);}
 function setStatus(t){syncStatus.textContent=t;}
 function fmtTime(t){try{return new Date(t).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}}
 
-function gInit(){
-  if(!CLOUD_ON||!window.google||!window.google.accounts||!window.google.accounts.oauth2)return;
-  tokenClient=google.accounts.oauth2.initTokenClient({
-    client_id:GOOGLE_CLIENT_ID,
-    scope:'https://www.googleapis.com/auth/drive.appdata',
-    callback:onToken,
-  });
-  try{tokenClient.requestAccessToken({prompt:''});}catch(e){}
+function b64url(bytes){
+  let s=''; for(let i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
-function onToken(resp){
-  if(resp&&resp.access_token){gToken=resp.access_token; setCloudUI(true); drivePull();}
+function randB64(n){const a=new Uint8Array(n); crypto.getRandomValues(a); return b64url(a);}
+async function pkceChallenge(v){
+  const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));
+  return b64url(new Uint8Array(d));
+}
+function gLogin(){
+  const verifier=randB64(64);
+  try{sessionStorage.setItem('pkce_v',verifier);}catch(e){}
+  pkceChallenge(verifier).then(ch=>{
+    const u=new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    u.searchParams.set('client_id',GOOGLE_CLIENT_ID);
+    u.searchParams.set('redirect_uri',REDIRECT_URI);
+    u.searchParams.set('response_type','code');
+    u.searchParams.set('scope',G_SCOPE);
+    u.searchParams.set('code_challenge',ch);
+    u.searchParams.set('code_challenge_method','S256');
+    u.searchParams.set('access_type','offline');
+    u.searchParams.set('prompt','consent');
+    location.href=u.toString();
+  });
+}
+async function gExchange(code){
+  let verifier=''; try{verifier=sessionStorage.getItem('pkce_v')||'';}catch(e){}
+  const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,code:code,code_verifier:verifier,
+    grant_type:'authorization_code',redirect_uri:REDIRECT_URI});
+  let j={};
+  try{
+    const r=await fetch('https://oauth2.googleapis.com/token',
+      {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});
+    j=await r.json();
+  }catch(e){}
+  try{history.replaceState(null,'',REDIRECT_URI);}catch(e){}
+  if(j.refresh_token){try{localStorage.setItem('gdrive_rt',j.refresh_token);}catch(e){}}
+  return j.access_token||null;
+}
+async function gRefresh(){
+  let rt=null; try{rt=localStorage.getItem('gdrive_rt');}catch(e){}
+  if(!rt)return null;
+  const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,grant_type:'refresh_token',refresh_token:rt});
+  let r;
+  try{
+    r=await fetch('https://oauth2.googleapis.com/token',
+      {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});
+  }catch(e){return null;}
+  if(!r.ok){try{localStorage.removeItem('gdrive_rt');}catch(e){} return null;}
+  const j=await r.json().catch(()=>({}));
+  return j.access_token||null;
+}
+async function gInit(){
+  if(!CLOUD_ON)return;
+  try{
+    const params=new URLSearchParams(location.search);
+    if(params.get('error')){try{history.replaceState(null,'',REDIRECT_URI);}catch(e){}}
+    else{
+      const code=params.get('code');
+      if(code)gToken=await gExchange(code);
+      if(!gToken)gToken=await gRefresh();
+    }
+  }catch(e){}
+  if(gToken){setCloudUI(true); drivePull();}
   else setCloudUI(false);
 }
-let gTries=0;
-const gWait=setInterval(()=>{
-  if(window.google&&window.google.accounts&&window.google.accounts.oauth2){clearInterval(gWait); gInit();}
-  else if(++gTries>60){clearInterval(gWait);}
-},250);
+gInit();
 
 cloudBtn.addEventListener('click',e=>{
   e.stopPropagation();
-  if(!CLOUD_ON){toast('Синхронизация ещё настраивается'); return;}
-  if(!tokenClient){toast('Google ещё загружается…'); return;}
   if(gToken){syncPanel.hidden=!syncPanel.hidden;}
-  else{try{tokenClient.requestAccessToken({prompt:'consent'});}catch(err){}}
+  else gLogin();
 });
 document.addEventListener('click',e=>{if(!syncPanel.hidden&&!e.target.closest('.sync-panel'))syncPanel.hidden=true;});
 $('syncNowBtn').addEventListener('click',()=>{syncPanel.hidden=true; if(gToken)drivePull();});
-$('syncLogoutBtn').addEventListener('click',()=>{
+$('syncLogoutBtn').addEventListener('click',async()=>{
   syncPanel.hidden=true;
-  if(gToken&&window.google&&window.google.accounts){try{google.accounts.oauth2.revoke(gToken,()=>{});}catch(e){}}
+  try{
+    const rt=localStorage.getItem('gdrive_rt');
+    if(rt)await fetch('https://oauth2.googleapis.com/revoke',
+      {method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+       body:'token='+encodeURIComponent(rt)});
+  }catch(e){}
+  try{localStorage.removeItem('gdrive_rt');}catch(e){}
   gToken=null; driveFileId=null; setCloudUI(false); toast('Выход выполнен');
 });
 
-async function driveApi(path,opts){
+async function driveApi(path,opts,retried){
   opts=opts||{};
+  if(!gToken)throw new Error('auth');
   opts.headers=Object.assign({'Authorization':'Bearer '+gToken},opts.headers||{});
-  const r=await fetch('https://www.googleapis.com/'+path,opts);
+  let r;
+  try{r=await fetch('https://www.googleapis.com/'+path,opts);}
+  catch(e){throw new Error('net');}
+  if(r.status===401&&!retried){
+    gToken=await gRefresh();
+    if(gToken)return driveApi(path,opts,true);
+    setCloudUI(false); throw new Error('auth');
+  }
   if(r.status===401||r.status===403){gToken=null; setCloudUI(false); throw new Error('auth');}
   if(!r.ok)throw new Error('drive '+r.status);
   return r;
@@ -772,7 +834,10 @@ async function drivePull(){
     }else{
       await drivePushNow();
     }
-  }catch(e){if(e.message!=='auth')setStatus('Ошибка синхронизации');}
+  }catch(e){
+    if(e.message==='net')setStatus('Нет соединения');
+    else if(e.message!=='auth')setStatus('Ошибка синхронизации');
+  }
   setBusy(false);
 }
 async function drivePushNow(){
