@@ -219,6 +219,18 @@ button{font-family:inherit;}
 .detail-foot .icon-btn{width:54px; height:54px;}
 .detail-foot .star{font-size:26px;}
 
+/* шаринг */
+.share-list{display:flex; flex-direction:column; gap:10px; margin-bottom:16px;}
+.share-item{display:flex; align-items:center; gap:14px; width:100%; padding:14px 16px;
+  border-radius:18px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05);
+  color:#fff; font-size:16px; font-weight:700; font-family:inherit; cursor:pointer; text-align:left;}
+.share-item:active{transform:scale(.98);}
+.share-item svg{flex:none; color:var(--gold);}
+.share-item small{display:block; font-size:12.5px; font-weight:400; color:rgba(243,237,227,.5); margin-top:3px;}
+.imp-title{font-size:21px; font-weight:800; color:#fff; margin:0 0 10px;}
+.imp-text{white-space:pre-wrap; word-break:break-word; font-size:15.5px; line-height:1.55;
+  color:rgba(243,237,227,.85); margin:0 0 18px; max-height:38dvh; overflow:auto;}
+
 /* шторка добавления */
 .overlay{position:fixed; inset:0; z-index:60; background:rgba(10,10,14,.45);
   display:flex; align-items:flex-end; justify-content:center;
@@ -316,6 +328,44 @@ body.lock{overflow:hidden;}
     </div>
 </section>
 
+<!-- ШАРИНГ -->
+<div class="overlay" id="shareOverlay">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Поделиться</h3>
+    <div class="share-list">
+      <button class="share-item" id="shareSystem">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+        <span>Поделиться…<small>Отправить текст в мессенджер или другое приложение</small></span>
+      </button>
+      <button class="share-item" id="shareLink">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+        <span>Скопировать ссылку<small>Открывший сможет добавить промпт себе</small></span>
+      </button>
+      <button class="share-item" id="shareTxt">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        <span>Сохранить .txt<small>Текстовый файл для переноса</small></span>
+      </button>
+    </div>
+    <div class="sheet-foot"><button class="btn ghost" id="shareClose">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- ИМПОРТ ПО ССЫЛКЕ -->
+<div class="overlay" id="importOverlay">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h3>Вам прислали промпт</h3>
+    <div class="meta" id="impMeta" style="margin-bottom:10px"></div>
+    <div class="imp-title" id="impTitle"></div>
+    <p class="imp-text" id="impText"></p>
+    <div class="sheet-foot">
+      <button class="btn ghost" id="impCancel">Не надо</button>
+      <button class="btn primary" id="impAdd">Добавить себе</button>
+    </div>
+  </div>
+</div>
+
 <!-- ОСНОВНОЙ ЭКРАН -->
 <section id="app" hidden>
   <header class="hero">
@@ -385,6 +435,9 @@ body.lock{overflow:hidden;}
   <div class="detail-foot">
     <button class="copybtn big" id="detailCopy">Копировать</button>
     <div class="row-btns">
+      <button class="icon-btn" id="detailShare" aria-label="Поделиться">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+      </button>
       <button class="icon-btn star" id="detailFav" aria-label="В избранное">★</button>
       <button class="icon-btn" id="detailEdit" aria-label="Редактировать"></button>
       <button class="icon-btn danger" id="detailDel" aria-label="Удалить"></button>
@@ -725,6 +778,104 @@ detailDel.addEventListener('click',()=>{
   }
 });
 
+/* ---------- шаринг ---------- */
+const curPrompt=()=>db.prompts.find(x=>x.id===detailId);
+function shareTextOf(p){
+  let s=p.name||'Промпт';
+  if(p.category)s+='\nКатегория: '+p.category;
+  if(p.tags&&p.tags.length)s+='\nТеги: '+p.tags.join(', ');
+  return s+'\n\n'+(p.text||'');
+}
+function copyRaw(t,msg){
+  const done=()=>toast(msg||'Скопировано');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(()=>done());
+  }else{
+    const ta=document.createElement('textarea');
+    ta.value=t; ta.style.cssText='position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    ta.remove(); done();
+  }
+}
+function openShare(){$('shareOverlay').classList.add('show'); document.body.classList.add('lock');}
+function closeShare(){$('shareOverlay').classList.remove('show'); document.body.classList.remove('lock');}
+$('detailShare').addEventListener('click',()=>{if(curPrompt())openShare();});
+$('shareClose').addEventListener('click',closeShare);
+$('shareOverlay').addEventListener('click',e=>{if(e.target===$('shareOverlay'))closeShare();});
+$('shareSystem').addEventListener('click',async()=>{
+  const p=curPrompt(); if(!p)return; closeShare();
+  const txt=shareTextOf(p);
+  if(navigator.share){try{await navigator.share({title:p.name,text:txt});}catch(e){}}
+  else copyRaw(txt,'Текст скопирован');
+});
+function b64enc(bytes){
+  let s='';
+  for(let i=0;i<bytes.length;i+=8192){s+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));}
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function sharePayload(p){
+  const o={n:p.name||'',c:p.category||'',t:p.text||'',
+    g:(p.tags||[]).filter(x=>typeof x==='string').slice(0,12)};
+  return b64enc(new TextEncoder().encode(JSON.stringify(o)));
+}
+$('shareLink').addEventListener('click',()=>{
+  const p=curPrompt(); if(!p)return;
+  const url=location.href.split('?')[0].split('#')[0]+'?s='+sharePayload(p);
+  if(url.length>6000){toastErr('Слишком длинный для ссылки — поделись текстом'); return;}
+  closeShare(); copyRaw(url,'Ссылка скопирована');
+});
+$('shareTxt').addEventListener('click',()=>{
+  const p=curPrompt(); if(!p)return; closeShare();
+  const blob=new Blob([shareTextOf(p)],{type:'text/plain;charset=utf-8'});
+  const nm=((p.name||'prompt').slice(0,40).replace(/[\\/:*?"<>|]/g,'').trim()||'prompt')+'.txt';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=nm;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  toast('Файл сохранён');
+});
+
+/* ---------- импорт по ссылке ---------- */
+function shareDecode(s){
+  s=s.replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length%4)s+='=';
+  const bin=atob(s);
+  const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));
+  const o=JSON.parse(new TextDecoder().decode(bytes));
+  if(!o||typeof o.t!=='string')throw new Error('bad');
+  return {name:String(o.n||'Без названия'),category:String(o.c||''),text:o.t,
+    tags:Array.isArray(o.g)?o.g.filter(x=>typeof x==='string').slice(0,12):[]};
+}
+let importData=null;
+function cleanShareUrl(){try{history.replaceState(null,'',location.href.split('?')[0].split('#')[0]);}catch(e){}}
+function closeImport(){
+  importData=null; cleanShareUrl();
+  $('importOverlay').classList.remove('show'); document.body.classList.remove('lock');
+}
+function handleSharedLink(){
+  let s=null;
+  try{s=new URLSearchParams(location.search).get('s');}catch(e){}
+  if(!s)return;
+  try{importData=shareDecode(s);}
+  catch(e){cleanShareUrl(); toastErr('Не удалось прочитать ссылку'); return;}
+  const meta=(importData.category?'<span class="model-pill">'+esc(importData.category)+'</span>':'')
+    +importData.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join('');
+  $('impMeta').innerHTML=meta; $('impMeta').style.display=meta?'flex':'none';
+  $('impTitle').textContent=importData.name;
+  $('impText').textContent=importData.text;
+  $('importOverlay').classList.add('show'); document.body.classList.add('lock');
+}
+$('impAdd').addEventListener('click',()=>{
+  if(importData){
+    db.prompts.push({id:uid(),name:importData.name,text:importData.text,
+      category:importData.category,tags:importData.tags,fav:false,img:null,createdAt:Date.now()});
+    save(); render(); toast('Промпт добавлен');
+  }
+  closeImport();
+});
+$('impCancel').addEventListener('click',closeImport);
+
 /* ---------- Google Drive sync (PKCE: вход запоминается) ---------- */
 const GOOGLE_CLIENT_ID='473641590554-ucq89mp3udsj552efp0cnbsmofqf1v8r.apps.googleusercontent.com';
 const REDIRECT_URI='https://aukro1408.github.io/prompts/';
@@ -814,10 +965,10 @@ async function gInit(){
       if(!gToken)gToken=await gRefresh();
     }
   }catch(e){}
-  if(gToken){setCloudUI(true); drivePull();}
+  if(gToken){setCloudUI(true); await drivePull();}
   else setCloudUI(false);
 }
-gInit();
+gInit().then(handleSharedLink);
 
 cloudBtn.addEventListener('click',e=>{
   e.stopPropagation();
