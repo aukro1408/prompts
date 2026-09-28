@@ -11,6 +11,9 @@
 <meta name="apple-mobile-web-app-title" content="Промпты">
 <link rel="apple-touch-icon" href="img/icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&display=swap" rel="stylesheet">
 <title>Промпты</title>
 <style>
 :root{
@@ -295,7 +298,36 @@ body.lock{overflow:hidden;}
 @keyframes artIn{from{opacity:0; transform:scale(.92) translateY(28px);} to{opacity:1; transform:none;}}
 @keyframes artFloat{0%,100%{transform:translateY(0);} 50%{transform:translateY(-9px);}}
 @keyframes glowPulse{0%,100%{opacity:.7; transform:scale(1);} 50%{opacity:1; transform:scale(1.07);}}
-#onboard .onboard-body h1{animation:riseIn .9s cubic-bezier(.2,.8,.25,1) .35s both;}
+#onboard .glow-wrap{perspective:700px; margin:16px 0 12px;
+  animation:riseIn .9s cubic-bezier(.2,.8,.25,1) .35s both;}
+#onboard h1.glow3d{position:relative; margin:0; text-align:center;
+  font-family:'Comfortaa',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:38px; line-height:1.14; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  transform-style:preserve-3d; animation:glowWobble 5s ease-in-out infinite;}
+#onboard h1.glow3d span{position:absolute; inset:0; display:block; color:#3d2708;
+  animation:glowGold 8s ease-in-out infinite;}
+#onboard h1.glow3d span:first-child{position:relative;}
+#onboard h1.glow3d span:nth-child(2){transform:translateZ(5px);}
+#onboard h1.glow3d span:nth-child(3){transform:translateZ(10px);}
+#onboard h1.glow3d span:nth-child(4){transform:translateZ(15px);}
+#onboard h1.glow3d span:nth-child(5){transform:translateZ(20px);}
+#onboard h1.glow3d span:nth-child(6){transform:translateZ(25px);}
+#onboard h1.glow3d span:nth-child(7){transform:translateZ(30px);}
+#onboard h1.glow3d span:nth-child(8){transform:translateZ(35px);}
+#onboard h1.glow3d span:nth-child(9){transform:translateZ(40px);}
+#onboard h1.glow3d span:nth-child(10){transform:translateZ(45px);}
+@keyframes glowWobble{
+  0%,100%{transform:rotate3d(1,1,0,40deg);}
+  25%{transform:rotate3d(-1,1,0,40deg);}
+  50%{transform:rotate3d(-1,-1,0,40deg);}
+  75%{transform:rotate3d(1,-1,0,40deg);}
+}
+@keyframes glowGold{
+  0%,100%{text-shadow:0 0 14px rgba(255,190,70,.85), 0 0 44px rgba(255,170,40,.45);}
+  25%{text-shadow:0 0 14px rgba(246,168,62,.85), 0 0 44px rgba(246,140,40,.45);}
+  50%{text-shadow:0 0 14px rgba(255,214,130,.9), 0 0 44px rgba(255,200,100,.5);}
+  75%{text-shadow:0 0 14px rgba(232,150,50,.85), 0 0 44px rgba(230,140,40,.45);}
+}
 #onboard .onboard-body .sub{animation:riseIn .9s cubic-bezier(.2,.8,.25,1) .5s both;}
 #onboard .slider{animation:riseIn .9s cubic-bezier(.2,.8,.25,1) .65s both;}
 #onboard .slider::after{content:""; position:absolute; inset:0; pointer-events:none;
@@ -306,6 +338,7 @@ body.lock{overflow:hidden;}
 
 @media (prefers-reduced-motion: reduce){
   *{animation:none !important; transition:none !important;}
+  #onboard h1.glow3d span{color:#8a5a17; text-shadow:0 0 18px rgba(255,190,70,.55);}
 }
 </style>
 </head>
@@ -316,7 +349,9 @@ body.lock{overflow:hidden;}
     <div class="art"><div class="hero-shadow"><img class="hero" src="img/hero2.png" alt="Кот с папкой промптов"></div></div>
     <div class="onboard-body">
 
-    <h1>Сохраняй<br>свои промпты</h1>
+    <div class="glow-wrap">
+      <h1 class="glow3d" aria-label="Сохраняй свои промпты"><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span><span aria-hidden="true">Сохраняй<br>свои промпты</span></h1>
+    </div>
     <p class="sub">Создавай коллекции, сортируй<br>и находи нужные промпты<br>в любой момент</p>
     <div class="spacer"></div>
 
