@@ -58,10 +58,29 @@ button{font-family:inherit;}
     radial-gradient(90% 26% at 50% 108%, rgba(232,168,62,.06), rgba(232,168,62,0) 60%),
     #131009;}
 #app[hidden]{display:none;}
-.app-body{padding:0 18px;}
+.app-body{padding:16px 18px 0;}
 .hero{position:relative; overflow:hidden; border-radius:0 0 32px 32px;
   min-height:252px; display:flex; align-items:flex-end;
-  box-shadow:0 18px 44px rgba(0,0,0,.45);}
+  box-shadow:0 18px 44px rgba(0,0,0,.45);
+  transition:min-height .38s cubic-bezier(.2,.8,.25,1), border-radius .38s ease;}
+.hero-bg{transition:transform .5s ease;}
+.hero-titles{transition:padding .38s ease;}
+.hero-titles h2{transition:font-size .38s ease;}
+/* липкая шапка: при скролле баннер сжимается, поиск и категории остаются */
+.topwrap{position:sticky; top:0; z-index:40;}
+.toolbar{padding:0 18px; border-radius:0 0 26px 26px;
+  transition:background .3s ease, box-shadow .3s ease, border-color .3s ease;
+  border-bottom:1px solid transparent;}
+#app.scrolled .hero{min-height:84px; border-radius:0 0 26px 26px;}
+#app.scrolled .hero-bg{transform:scale(1.08);}
+#app.scrolled .hero-titles{padding:0 22px 16px;}
+#app.scrolled .hero-titles h2{font-size:25px;}
+#app.scrolled .hero-titles h2 br{display:none;}
+#app.scrolled .hero-titles p{display:none;}
+#app.scrolled .dust{display:none;}
+#app.scrolled .toolbar{background:rgba(19,16,9,.86);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  box-shadow:0 14px 30px rgba(0,0,0,.4); border-bottom-color:rgba(232,168,62,.14);}
 .hero-bg{position:absolute; inset:0; width:100%; height:100%; object-fit:cover;}
 .dust{position:absolute; inset:0; z-index:1; pointer-events:none; overflow:hidden;}
 .dust i{position:absolute; bottom:-12px; border-radius:50%;
@@ -371,6 +390,7 @@ body.lock{overflow:hidden;}
 
 <!-- ОСНОВНОЙ ЭКРАН -->
 <section id="app" hidden>
+  <div class="topwrap">
   <header class="hero">
     <img class="hero-bg" src="img/hero-banner-british.jpg" alt="">
     <div class="dust" id="dust"></div>
@@ -380,7 +400,7 @@ body.lock{overflow:hidden;}
     </div>
   </header>
 
-  <div class="app-body">
+  <div class="toolbar">
   <div class="searchrow">
     <div class="search">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8a8a93" stroke-width="2" stroke-linecap="round">
@@ -413,7 +433,10 @@ body.lock{overflow:hidden;}
   </div>
   <p class="count" id="count"></p>
   <div class="catfilter" id="catFilter"></div>
+  </div>
+  </div>
 
+  <div class="app-body">
   <div id="list"></div>
 
   <div id="empty" hidden>
@@ -558,7 +581,7 @@ function unlock(){
 function finishOnboard(){
   db.onboarded=true; save();
   onboard.classList.add('leave');
-  setTimeout(()=>{onboard.hidden=true; app.hidden=false;},480);
+  setTimeout(()=>{onboard.hidden=true; app.hidden=false; updTopbar();},480);
 }
 function resetSlider(){
   slider.classList.remove('done');
@@ -680,6 +703,17 @@ function updCatFade(){
 }
 $('catFilter').addEventListener('scroll',updCatFade,{passive:true});
 addEventListener('resize',updCatFade);
+
+/* липкая шапка: сжатие баннера при скролле */
+function updTopbar(){
+  const a=$('app'); if(!a||a.hidden)return;
+  a.classList.toggle('scrolled',scrollY>64);
+}
+let tbTick=false;
+addEventListener('scroll',()=>{
+  if(tbTick)return; tbTick=true;
+  requestAnimationFrame(()=>{tbTick=false; updTopbar();});
+},{passive:true});
 fModel.addEventListener('input',markChips);
 $('fCatAdd').addEventListener('click',()=>{
   const v=$('fCatNew').value.trim();
@@ -773,7 +807,7 @@ function openDetail(id){
   detailDel.classList.remove('arm'); detailDel.dataset.arm=''; detailDel.innerHTML=trash;
   app.hidden=true; detail.hidden=false; scrollTo(0,0);
 }
-function closeDetail(){detailId=null; detail.hidden=true; app.hidden=false;}
+function closeDetail(){detailId=null; detail.hidden=true; app.hidden=false; updTopbar();}
 $('detailBack').addEventListener('click',closeDetail);
 detailCopy.addEventListener('click',()=>{const p=db.prompts.find(x=>x.id===detailId); if(p)copyText(p.text);});
 detailFav.addEventListener('click',()=>{const p=db.prompts.find(x=>x.id===detailId); if(!p)return;
@@ -1170,7 +1204,7 @@ q.addEventListener('input',render);
 
 /* ---------- старт ---------- */
 measure();
-if(db.onboarded){onboard.hidden=true; app.hidden=false;}
+if(db.onboarded){onboard.hidden=true; app.hidden=false; updTopbar();}
 render();
 })();
 </script>
