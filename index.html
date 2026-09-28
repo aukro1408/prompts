@@ -62,16 +62,16 @@ button{font-family:inherit;}
 .hero{position:relative; overflow:hidden; border-radius:0 0 32px 32px;
   min-height:252px; display:flex; align-items:flex-end;
   box-shadow:0 18px 44px rgba(0,0,0,.45);
-  transition:min-height .38s cubic-bezier(.2,.8,.25,1), border-radius .38s ease;}
+  transition:border-radius .38s ease;}
 .hero-bg{transition:transform .5s ease;}
 .hero-titles{transition:padding .38s ease;}
 .hero-titles h2{transition:font-size .38s ease;}
-/* липкая шапка: при скролле баннер сжимается, поиск и категории остаются */
-.topwrap{position:sticky; top:0; z-index:40;}
+/* липкая шапка: баннер уезжает вверх и фиксируется, высота страницы не меняется */
+.topwrap{position:sticky; top:-168px; z-index:40;}
 .toolbar{padding:0 18px; border-radius:0 0 26px 26px;
   transition:background .3s ease, box-shadow .3s ease, border-color .3s ease;
   border-bottom:1px solid transparent;}
-#app.scrolled .hero{min-height:84px; border-radius:0 0 26px 26px;}
+#app.scrolled .hero{border-radius:0 0 26px 26px;}
 #app.scrolled .hero-bg{transform:scale(1.08);}
 #app.scrolled .hero-titles{padding:0 22px 16px;}
 #app.scrolled .hero-titles h2{font-size:25px;}
@@ -707,7 +707,7 @@ addEventListener('resize',updCatFade);
 /* липкая шапка: сжатие баннера при скролле */
 function updTopbar(){
   const a=$('app'); if(!a||a.hidden)return;
-  a.classList.toggle('scrolled',scrollY>64);
+  a.classList.toggle('scrolled',scrollY>100);
 }
 let tbTick=false;
 addEventListener('scroll',()=>{
