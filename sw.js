@@ -1,5 +1,5 @@
 /* Промпты — service worker: офлайн-оболочка приложения */
-const CACHE = 'prompts-v1';
+const CACHE = 'prompts-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,9 @@ const ASSETS = [
   './img/icon-512.png',
   './img/hero-banner-british.jpg',
   './img/card-placeholder.jpg',
-  './img/hero2.png'
+  './img/welcome-bg.jpg',
+  './img/welcome-cat.jpg',
+  './img/welcome-dust.jpg'
 ];
 
 self.addEventListener('install', e => {
