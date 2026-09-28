@@ -289,10 +289,14 @@ body.lock{overflow:hidden;}
   -webkit-mask-image:var(--wave); mask-image:var(--wave);
   -webkit-mask-size:100% 100%; mask-size:100% 100%;
   aspect-ratio:6/7;}
-/* слои параллакса приветствия: едут за наклоном телефона */
+/* слои параллакса приветствия: наша картинка + пыль и свечение поверх */
+#welcomeScene{cursor:grab;}
+#welcomeScene:active{cursor:grabbing;}
 .wlayer{position:absolute; left:-7%; top:-7%; width:114%; height:114%; max-width:none;
-  object-fit:cover; will-change:transform;}
-.wlayer.blend{mix-blend-mode:screen;}
+  object-fit:cover; will-change:transform; pointer-events:none;}
+.wlayer.base{left:0; top:0; width:100%; height:100%;}
+.wlayer.dust{mix-blend-mode:screen;}
+.wlayer.glow{background:radial-gradient(ellipse at 50% 62%, rgba(255,190,90,.34), rgba(255,190,90,0) 62%);}
 #onboard .hero-shadow{filter:drop-shadow(0 24px 30px rgba(146,84,10,.28));}
 #onboard .art::before{content:""; position:absolute; inset:-10% -6%; z-index:-1;
   background:radial-gradient(ellipse at 50% 42%, rgba(255,186,84,.42), rgba(255,186,84,0) 66%);
@@ -319,9 +323,9 @@ body.lock{overflow:hidden;}
 <!-- ПРИВЕТСТВЕННЫЙ ЭКРАН -->
 <section id="onboard">
     <div class="art"><div class="hero-shadow"><div class="hero" id="welcomeScene" role="img" aria-label="Кот с папкой промптов">
-      <img class="wlayer" data-depth="0.12" src="img/welcome-bg.jpg" alt="">
-      <img class="wlayer blend" data-depth="0.3" src="img/welcome-cat.jpg" alt="">
-      <img class="wlayer blend" data-depth="0.55" src="img/welcome-dust.jpg" alt="">
+      <img class="wlayer base" src="img/hero2.png" alt="">
+      <div class="wlayer glow" data-depth="0.22"></div>
+      <img class="wlayer dust" data-depth="0.5" src="img/welcome-dust.jpg" alt="">
     </div></div></div>
     <div class="onboard-body">
 
@@ -575,35 +579,52 @@ function resetSlider(){
   knob.style.transition='';
   label.textContent='Проведи, чтобы войти'; label.style.opacity='1';
 }
-/* ---------- параллакс приветствия: слои едут за наклоном телефона ---------- */
+/* ---------- параллакс приветствия: гироскоп + палец + лёгкое «дыхание» ---------- */
 (function(){
   const scene=$('welcomeScene');
-  if(!scene||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(!scene)return;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   const layers=[...scene.querySelectorAll('.wlayer')];
   const tgt={x:0,y:0}, cur={x:0,y:0};
-  let raf=0;
-  function frame(){
+  let raf=0, drag=null;
+  const t0=performance.now();
+  function frame(now){
+    const t=(now-t0)/1000;
     cur.x+=(tgt.x-cur.x)*.08; cur.y+=(tgt.y-cur.y)*.08;
-    for(const l of layers){
-      const d=+l.dataset.depth||.3;
-      l.style.transform='translate3d('+(cur.x*d*26).toFixed(1)+'px,'+(cur.y*d*26).toFixed(1)+'px,0)';
-    }
+    layers.forEach((l,i)=>{
+      const d=l.hasAttribute('data-depth')?parseFloat(l.dataset.depth):0;
+      let dx=cur.x*d*26, dy=cur.y*d*26;
+      if(!reduce){dx+=Math.sin(t*.6+i*2.1)*5*d; dy+=Math.cos(t*.5+i*1.7)*5*d;}
+      l.style.transform='translate3d('+dx.toFixed(1)+'px,'+dy.toFixed(1)+'px,0)';
+    });
     raf=$('onboard').hidden?0:requestAnimationFrame(frame);
   }
   function start(){if(!raf&&!$('onboard').hidden)raf=requestAnimationFrame(frame);}
-  addEventListener('deviceorientation',e=>{
-    if(e.gamma==null||e.beta==null)return;
-    tgt.x=Math.max(-1,Math.min(1,e.gamma/28));
-    tgt.y=Math.max(-1,Math.min(1,(e.beta-50)/28));
+  /* палец — работает всегда */
+  scene.style.touchAction='none';
+  scene.addEventListener('pointerdown',e=>{
+    drag={x:e.clientX,y:e.clientY};
+    try{scene.setPointerCapture(e.pointerId);}catch(_){}
+  });
+  scene.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    tgt.x=Math.max(-1,Math.min(1,(e.clientX-drag.x)/140));
+    tgt.y=Math.max(-1,Math.min(1,(e.clientY-drag.y)/140));
     start();
-  },{passive:true});
-  addEventListener('pointermove',e=>{
-    if(matchMedia('(pointer:coarse)').matches)return;
-    tgt.x=(e.clientX/innerWidth-.5)*2; tgt.y=(e.clientY/innerHeight-.5)*2;
-    start();
-  },{passive:true});
-  if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission){
-    addEventListener('touchend',()=>{DeviceOrientationEvent.requestPermission().catch(()=>{});},{once:true});
+  });
+  addEventListener('pointerup',()=>{drag=null; tgt.x=0; tgt.y=0;});
+  addEventListener('pointercancel',()=>{drag=null; tgt.x=0; tgt.y=0;});
+  /* гироскоп */
+  if(!reduce){
+    addEventListener('deviceorientation',e=>{
+      if(drag||e.gamma==null||e.beta==null)return;
+      tgt.x=-Math.max(-1,Math.min(1,e.gamma/28));
+      tgt.y=-Math.max(-1,Math.min(1,(e.beta-50)/28));
+      start();
+    },{passive:true});
+    if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission){
+      addEventListener('touchend',()=>{DeviceOrientationEvent.requestPermission().catch(()=>{});},{once:true});
+    }
   }
   start();
 })();
