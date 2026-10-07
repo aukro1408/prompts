@@ -397,6 +397,7 @@ body.lock{overflow:hidden;}
     <div class="sync-panel" id="syncPanel" hidden>
       <div class="sync-status" id="syncStatus">Не подключено</div>
       <button class="sync-action" id="syncNowBtn">Синхронизировать сейчас</button>
+      <button class="sync-action" id="recoverBtn">Восстановить из истории</button>
       <button class="sync-action dim" id="syncLogoutBtn">Выйти</button>
     </div>
     <div class="secret-wrap" id="secretWrap" hidden>
@@ -989,6 +990,7 @@ cloudBtn.addEventListener('click',e=>{
 });
 document.addEventListener('click',e=>{if(!syncPanel.hidden&&!e.target.closest('.sync-panel'))syncPanel.hidden=true;});
 $('syncNowBtn').addEventListener('click',()=>{syncPanel.hidden=true; if(gToken)drivePull();});
+$('recoverBtn').addEventListener('click',()=>{syncPanel.hidden=true; driveRecover();});
 $('syncLogoutBtn').addEventListener('click',async()=>{
   syncPanel.hidden=true;
   try{
@@ -1045,18 +1047,22 @@ async function drivePull(){
       driveFileId=id;
       const remote=await (await driveApi('drive/v3/files/'+id+'?alt=media')).json();
       const rTime=remote.updatedAt||0, lTime=db.savedAt||0;
-      if(remote&&Array.isArray(remote.prompts)&&rTime>lTime){
-        db.prompts=remote.prompts; db.onboarded=!!remote.onboarded; db.savedAt=rTime;
+      const rPrompts=Array.isArray(remote.prompts)?remote.prompts:[];
+      const localEmpty=db.prompts.length===0, remoteHas=rPrompts.length>0;
+      if(remote&&remoteHas&&(rTime>lTime||localEmpty)){
+        db.prompts=rPrompts; db.onboarded=!!remote.onboarded; db.savedAt=rTime;
         db.customCats=Array.isArray(remote.customCats)?remote.customCats:[];
         saveLocal(); buildCatChips(); renderCatFilter(); render(); toast('Данные восстановлены с Диска');
         setStatus('Синхронизировано '+fmtTime(rTime));
-      }else if(lTime>rTime){
+      }else if(lTime>rTime&&!localEmpty){
         await drivePushNow();
       }else{
         setStatus('Всё уже синхронизировано');
       }
-    }else{
+    }else if(db.prompts.length>0){
       await drivePushNow();
+    }else{
+      setStatus('Нечего синхронизировать');
     }
   }catch(e){
     if(e.message==='net')setStatus('Нет соединения');
@@ -1066,6 +1072,11 @@ async function drivePull(){
 }
 async function drivePushNow(){
   if(!gToken)return;
+  if(db.prompts.length===0){
+    // защита от затирания: пустая база никогда не перезаписывает данные на Диске
+    try{await drivePull();}catch(e){}
+    if(db.prompts.length===0)return;
+  }
   const payload={v:1,updatedAt:Date.now(),onboarded:db.onboarded,prompts:db.prompts,customCats:db.customCats||[]};
   const body=JSON.stringify(payload);
   if(!driveFileId)driveFileId=await driveFind();
@@ -1081,6 +1092,40 @@ async function drivePushNow(){
   }
   db.savedAt=payload.updatedAt; saveLocal();
   setStatus('Синхронизировано '+fmtTime(payload.updatedAt));
+}
+/* ---------- восстановление из истории версий на Диске ---------- */
+async function driveRecover(){
+  if(!gToken){toastErr('Сначала войди в Google Диск'); gLogin(); return;}
+  setBusy(true); setStatus('Ищу копии на Диске…');
+  try{
+    const id=driveFileId||await driveFind();
+    if(!id){setStatus('Файл не найден на Диске'); toastErr('На Диске нет файла с промптами'); setBusy(false); return;}
+    driveFileId=id;
+    const head=await (await driveApi('drive/v3/files/'+id+'?alt=media')).json().catch(()=>null);
+    if(head&&Array.isArray(head.prompts)&&head.prompts.length>0){
+      restoreDb(head,'Данные восстановлены с Диска');
+    }else{
+      const rj=await (await driveApi('drive/v3/files/'+id+'/revisions?fields=revisions(id,modifiedTime)')).json().catch(()=>null);
+      const revs=((rj&&rj.revisions)||[]).sort((a,b)=>String(b.modifiedTime||'').localeCompare(String(a.modifiedTime||'')));
+      let found=null;
+      for(const r of revs){
+        const v=await (await driveApi('drive/v3/files/'+id+'/revisions/'+r.id+'?alt=media')).json().catch(()=>null);
+        if(v&&Array.isArray(v.prompts)&&v.prompts.length>0){found=v; break;}
+      }
+      if(found)restoreDb(found,'Восстановлено из копии от '+fmtTime(found.updatedAt||0));
+      else{setStatus('Копий с данными не найдено'); toastErr('В истории Диска нет копий с промптами');}
+    }
+  }catch(e){ setStatus('Ошибка восстановления'); }
+  setBusy(false);
+}
+function restoreDb(data,msg){
+  db.prompts=Array.isArray(data.prompts)?data.prompts:[];
+  db.customCats=Array.isArray(data.customCats)?data.customCats:[];
+  db.onboarded=true;
+  saveLocal(); buildCatChips(); renderCatFilter(); render();
+  toast(msg||'Данные восстановлены');
+  setStatus('Восстановлено '+fmtTime(Date.now()));
+  drivePushNow().catch(()=>{});
 }
 function schedulePush(){
   if(!gToken||!CLOUD_ON)return;
