@@ -920,7 +920,7 @@ function gSecret(){try{return localStorage.getItem('gdrive_cs')||'';}catch(e){re
 function gLogin(){
   if(!gSecret()){ $('secretWrap').hidden=false; setTimeout(()=>{try{$('secretInput').focus({preventScroll:true});}catch(e){}},80); return; }
   const verifier=randB64(64);
-  try{sessionStorage.setItem('pkce_v',verifier);}catch(e){}
+  try{localStorage.setItem('pkce_v',verifier);}catch(e){}
   pkceChallenge(verifier).then(ch=>{
     const u=new URL('https://accounts.google.com/o/oauth2/v2/auth');
     u.searchParams.set('client_id',GOOGLE_CLIENT_ID);
@@ -935,7 +935,7 @@ function gLogin(){
   });
 }
 async function gExchange(code){
-  let verifier=''; try{verifier=sessionStorage.getItem('pkce_v')||'';}catch(e){}
+  let verifier=''; try{verifier=localStorage.getItem('pkce_v')||''; localStorage.removeItem('pkce_v');}catch(e){}
   const body=new URLSearchParams({client_id:GOOGLE_CLIENT_ID,client_secret:gSecret(),code:code,code_verifier:verifier,
     grant_type:'authorization_code',redirect_uri:REDIRECT_URI});
   let j={}, http=0;
@@ -990,7 +990,7 @@ cloudBtn.addEventListener('click',e=>{
 });
 document.addEventListener('click',e=>{if(!syncPanel.hidden&&!e.target.closest('.sync-panel'))syncPanel.hidden=true;});
 $('syncNowBtn').addEventListener('click',()=>{syncPanel.hidden=true; if(gToken)drivePull();});
-$('recoverBtn').addEventListener('click',()=>{syncPanel.hidden=true; driveRecover();});
+$('recoverBtn').addEventListener('click',()=>{driveRecover();});
 $('syncLogoutBtn').addEventListener('click',async()=>{
   syncPanel.hidden=true;
   try{
@@ -1096,26 +1096,40 @@ async function drivePushNow(){
 /* ---------- восстановление из истории версий на Диске ---------- */
 async function driveRecover(){
   if(!gToken){toastErr('Сначала войди в Google Диск'); gLogin(); return;}
-  setBusy(true); setStatus('Ищу копии на Диске…');
+  setBusy(true);
   try{
-    const id=driveFileId||await driveFind();
+    setStatus('Ищу файл на Диске…');
+    let id=driveFileId||await driveFind();
+    if(!id){
+      setStatus('Ищу в корзине Диска…');
+      const q=encodeURIComponent("name='prompts.json' and 'appDataFolder' in parents and trashed=true");
+      const r=await driveApi('drive/v3/files?q='+q+'&spaces=appDataFolder&fields=files(id)&pageSize=1');
+      const j=await r.json();
+      id=(j.files&&j.files[0]&&j.files[0].id)||null;
+      if(id)await driveApi('drive/v3/files/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({trashed:false})});
+    }
     if(!id){setStatus('Файл не найден на Диске'); toastErr('На Диске нет файла с промптами'); setBusy(false); return;}
     driveFileId=id;
+    setStatus('Проверяю текущую копию…');
     const head=await (await driveApi('drive/v3/files/'+id+'?alt=media')).json().catch(()=>null);
-    if(head&&Array.isArray(head.prompts)&&head.prompts.length>0){
+    const headN=head&&Array.isArray(head.prompts)?head.prompts.length:0;
+    if(headN>0){
       restoreDb(head,'Данные восстановлены с Диска');
     }else{
+      setStatus('Текущая копия пуста. Смотрю историю версий…');
+      toast('Смотрю историю версий…');
       const rj=await (await driveApi('drive/v3/files/'+id+'/revisions?fields=revisions(id,modifiedTime)')).json().catch(()=>null);
       const revs=((rj&&rj.revisions)||[]).sort((a,b)=>String(b.modifiedTime||'').localeCompare(String(a.modifiedTime||'')));
       let found=null;
-      for(const r of revs){
-        const v=await (await driveApi('drive/v3/files/'+id+'/revisions/'+r.id+'?alt=media')).json().catch(()=>null);
+      for(let k=0;k<revs.length;k++){
+        setStatus('Проверяю версию '+(k+1)+' из '+revs.length+'…');
+        const v=await (await driveApi('drive/v3/files/'+id+'/revisions/'+revs[k].id+'?alt=media')).json().catch(()=>null);
         if(v&&Array.isArray(v.prompts)&&v.prompts.length>0){found=v; break;}
       }
-      if(found)restoreDb(found,'Восстановлено из копии от '+fmtTime(found.updatedAt||0));
-      else{setStatus('Копий с данными не найдено'); toastErr('В истории Диска нет копий с промптами');}
+      if(found)restoreDb(found,'Восстановлено '+found.prompts.length+' промптов (копия от '+fmtTime(found.updatedAt||0)+')');
+      else{setStatus('Копий с данными не найдено (версий: '+revs.length+')'); toastErr('В истории Диска нет копий с промптами');}
     }
-  }catch(e){ setStatus('Ошибка восстановления'); }
+  }catch(e){ setStatus('Ошибка восстановления'); toastErr('Ошибка восстановления'); }
   setBusy(false);
 }
 function restoreDb(data,msg){
